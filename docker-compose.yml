@@ -1,0 +1,48 @@
+FROM ubuntu:14.04
+
+RUN apt-get update && apt-get install -y apache2
+
+RUN apt-get install -y wget
+
+RUN apt-get update
+
+RUN apt-get install  -y build-essential\
+                        libxml2 libxml2-dev libssl-dev\
+                        pkg-config\
+                        libcurl4-gnutls-dev libjpeg-dev libpng12-dev libmysqlclient-dev
+
+COPY ./phpfarm /opt/phpfarm
+
+COPY ./custom-options-5.3.29.sh /opt/phpfarm/src/custom-options-5.3.29.sh 
+
+RUN cd /opt/phpfarm/src/ && ./compile.sh 5.3.29
+
+RUN wget -P /opt http://mysql.localhost.net.ar/Downloads/MySQL-5.4/mysql-5.4.3-beta-linux-x86_64-glibc23.tar.gz
+
+RUN cd /opt && tar -xf  mysql-5.4.3-beta-linux-x86_64-glibc23.tar.gz && ls -l
+
+RUN groupadd mysql && useradd -g mysql mysql 
+
+RUN cd /usr/local \
+    && ln -s /opt/mysql-5.4.3-beta-linux-x86_64-glibc23 mysql \
+    && cd mysql \
+    && chown -R mysql ./ \
+    && chgrp -R mysql ./ 
+
+COPY ./my.cnf /etc/mysql/my.cnf
+RUN cd /usr/local/mysql && tail --lines=1000 /etc/mysql/my.cnf && scripts/mysql_install_db --basedir=/usr/local/mysql --user=mysql
+
+RUN  chown -R root . \
+    && chown -R mysql data \
+    && bin/mysqld_safe --user=mysql &
+
+WORKDIR ~/Code/Test
+
+RUN mkdir -p /var/run/mysqld/ && chown mysql:mysql /var/run/mysqld/
+
+RUN apt-get install -y libapache2-mod-php5
+
+COPY ./for-ground.sh /for-ground.sh
+
+CMD ["sh","/for-ground.sh"]
+
